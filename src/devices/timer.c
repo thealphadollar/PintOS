@@ -29,7 +29,7 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-static bool lesser_sleep(const struct list_elem * elem1, const struct list_elem * elem2, void * aux);
+static bool lesser_sleep(const struct list_elem * elem1, const struct list_elem * elem2, void * _);
 
 /* List of processes in THREAD_BLOCKED state, that is, processes
    that are required to be sleeping and waiting to be unblocked once
@@ -285,7 +285,7 @@ real_time_delay (int64_t num, int32_t denom)
 /* Returns True if sleep_time of elem1 is less than 
 sleep_time of elem2. */
 static bool 
-lesser_sleep(const struct list_elem * elem1, const struct list_elem * elem2, void * aux)
+lesser_sleep(const struct list_elem * elem1, const struct list_elem * elem2, void * _)
 {
   struct thread * thread1 = list_entry(elem1, struct thread, sleep_elem);
   struct thread * thread2 = list_entry(elem2, struct thread, sleep_elem);
