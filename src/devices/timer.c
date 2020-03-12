@@ -198,7 +198,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   // wake up sleeping threads if required
   // traverse through all sleeping threads if sleep time is less than ticks
   for (struct list_elem *cur_elem = list_begin(&sleeping_threads); 
-    cur_elem!=list_end(&sleeping_threads); cur_elem=list_next(&sleeping_threads))
+    cur_elem!=list_end(&sleeping_threads); cur_elem=list_next(cur_elem))
     {
       struct thread *cur_thr = list_entry(cur_elem, struct thread, sleep_elem);
       // break loop if least sleep time thread still has time left
