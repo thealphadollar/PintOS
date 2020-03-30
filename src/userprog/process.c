@@ -18,8 +18,18 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#include "threads/malloc.h"
+
+// argument structure
+typedef struct arguments {
+  int argc;
+  char **argv;
+} args_t;
+
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (args_t *args, void (**eip) (void), void **esp);
+static void arg_parser(char *cmd, args_t *args);
+static void send_args_to_stack(args_t *args, void **esp);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -30,6 +40,8 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  args_t *args;
+  args = (args_t *) malloc(sizeof(args_t));
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -38,9 +50,17 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // allocate memory for arguments
+  args->argc = 0;
+  args->argv = (char **) calloc (strlen (fn_copy) + 1, sizeof (char));
+  // parse arguments from command
+  arg_parser(fn_copy, args);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (args->argv[0], PRI_DEFAULT, start_process, args);
   if (tid == TID_ERROR)
+    // free memory taken by args
+    free(args);
     palloc_free_page (fn_copy); 
   return tid;
 }
@@ -48,9 +68,10 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *args_)
 {
-  char *file_name = file_name_;
+  // char *file_name = file_name_;
+  args_t *args = args_;
   struct intr_frame if_;
   bool success;
 
@@ -59,10 +80,11 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  // success = load (file_name, &if_.eip, &if_.esp);
+  success = load (args, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  free(args);
   if (!success) 
     thread_exit ();
 
@@ -206,8 +228,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (args_t *args, void (**eip) (void), void **esp) 
 {
+  // init replaced argument
+  char *file_name = args->argv[0];
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -304,6 +328,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
+
+  send_args_to_stack (args, esp);
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -462,4 +488,64 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+/* 
+  Parse arguments from given command as per given in assignment declaration
+*/
+static void
+arg_parser (char *cmd, args_t *args)
+{
+  // initialize required variables
+  char *cur_ver, *rem;
+  cur_ver = strtok_r (cmd, " ", &rem);
+  while(cur_ver != NULL){
+    args->argv[args->argc ++] = cur_ver;
+    cur_ver = strtok_r (NULL, " ", &rem);
+  }
+}
+
+
+/* Send args to stack. */
+static void
+send_args_to_stack(args_t *args, void **esp)
+{
+  // initialize variables
+  void *cur_ver = *esp, *dest_addr;
+  void **arg_pointers = (void **) calloc (args->argc, sizeof (void *));
+  int arg_len, alignment, zero=0, i; 
+
+  for (i = (args->argc) - 1; i > -1; --i) {
+      arg_len = strlen (args->argv[i]) + 1;
+      dest_addr = cur_ver - arg_len;
+      memcpy (dest_addr, args->argv[i], arg_len);
+      cur_ver = dest_addr;
+      arg_pointers[i] = cur_ver;
+    }
+
+  alignment = ((uint32_t) cur_ver) % sizeof(uintptr_t);
+  for (i = 0; i < alignment ; i++)
+     memcpy (--cur_ver, &zero, 1);
+
+  cur_ver -= sizeof(uintptr_t);
+  memcpy (cur_ver, &zero, sizeof(uintptr_t));
+
+// push arguments onto stack
+  for (i = (args->argc) -1; i >= 0; i--)
+    {
+      cur_ver -= sizeof(uintptr_t);
+      memcpy (cur_ver, &arg_pointers[i], sizeof(uintptr_t));
+    }
+
+  // push various addresses onto the stack
+  cur_ver -= sizeof(uintptr_t);
+  memcpy (cur_ver, &cur_ver, sizeof(uintptr_t));
+  cur_ver -= sizeof(uintptr_t);
+  memcpy (cur_ver, &(args->argc), sizeof(uintptr_t));
+  cur_ver -= sizeof(uintptr_t);
+  memcpy (cur_ver, &zero, sizeof(uintptr_t));
+  *esp = (void *) cur_ver;
+
+  // free memory
+  free (arg_pointers);
 }
