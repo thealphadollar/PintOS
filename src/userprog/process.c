@@ -513,19 +513,19 @@ send_args_to_stack(args_t *args, void **esp)
   // initialize variables
   void *cur_ver = *esp, *dest_addr;
   void **arg_pointers = (void **) calloc (args->argc, sizeof (void *));
-  int arg_len, alignment, zero=0, i; 
+  int zero=0, one=1, i; 
 
   for (i = (args->argc) - 1; i > -1; --i) {
-      arg_len = strlen (args->argv[i]) + 1;
-      dest_addr = cur_ver - arg_len;
-      memcpy (dest_addr, args->argv[i], arg_len);
+      dest_addr = cur_ver - (strlen (args->argv[i]) + 1);
+      memcpy (dest_addr, args->argv[i], strlen (args->argv[i]) + 1);
       cur_ver = dest_addr;
       arg_pointers[i] = cur_ver;
     }
-
+  
+  int alignment;
   alignment = ((uint32_t) cur_ver) % sizeof(uintptr_t);
   for (i = 0; i < alignment ; i++)
-     memcpy (--cur_ver, &zero, 1);
+     memcpy (--cur_ver, &zero, one);
 
   cur_ver -= sizeof(uintptr_t);
   memcpy (cur_ver, &zero, sizeof(uintptr_t));
