@@ -512,40 +512,36 @@ static void
 send_args_to_stack(args_t *args, void **esp)
 {
   // initialize variables
-  void *cur_ver = *esp, *dest_addr;
-  void **arg_pointers = (void **) calloc (args->argc, sizeof (void *));
-  int zero=0, one=1, i; 
-
+  uint8_t *cur_ver = (uint8_t *) *esp;
+  uint32_t **arg_pointers = (uint32_t **) calloc (args->argc, sizeof (uint32_t *));
+  
+  int i;
   for (i = (args->argc) - 1; i > -1; --i) {
-      dest_addr = cur_ver - (strlen (args->argv[i]) + 1);
-      memcpy (dest_addr, args->argv[i], strlen (args->argv[i]) + 1);
-      cur_ver = dest_addr;
-      arg_pointers[i] = cur_ver;
+      // dest_addr = cur_ver - (strlen (args->argv[i]) + 1);
+      cur_ver -= (strlen (args->argv[i]) + 1);
+      memcpy (cur_ver, args->argv[i], strlen (args->argv[i]) + 1);
+      arg_pointers[i] = (uint32_t *) cur_ver;
     }
   
   int alignment;
   alignment = ((uint32_t) cur_ver) % sizeof(uintptr_t);
   for (i = 0; i < alignment ; i++)
-     memcpy (--cur_ver, &zero, one);
+     *(--cur_ver) = 0;
 
-  cur_ver -= sizeof(uintptr_t);
-  memcpy (cur_ver, &zero, sizeof(uintptr_t));
+  uint32_t *cur_ver32 = (uint32_t *) cur_ver;
+  *(--cur_ver32) = 0;
 
 // push arguments onto stack
   for (i = (args->argc) -1; i >= 0; i--)
     {
-      cur_ver -= sizeof(uintptr_t);
-      memcpy (cur_ver, &arg_pointers[i], sizeof(uintptr_t));
+      *(--cur_ver32) = arg_pointers[i];
     }
 
   // push various addresses onto the stack
-  cur_ver -= sizeof(uintptr_t);
-  memcpy (cur_ver, &cur_ver, sizeof(uintptr_t));
-  cur_ver -= sizeof(uintptr_t);
-  memcpy (cur_ver, &(args->argc), sizeof(uintptr_t));
-  cur_ver -= sizeof(uintptr_t);
-  memcpy (cur_ver, &zero, sizeof(uintptr_t));
-  *esp = (void *) cur_ver;
+  *(--cur_ver32) = (uint32_t)(cur_ver32+1);
+  *(--cur_ver32) = (uint32_t)(args->argc);
+  *(--cur_ver32) = 0;
+  *esp = (void *) cur_ver32;
 
   // free memory
   free (arg_pointers);
