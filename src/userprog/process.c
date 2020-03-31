@@ -121,14 +121,26 @@ start_process (void *args_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while (1);
-  return -1;
+  process *cur_proc = process_current(), *child = find_proc_child(cur_proc, child_tid);
+  if (child->is_waiting || child == NULL) return -1;
+  child->is_waiting = true;
+  while(!(child->status & PROC_EXIT)) thread_yield();
+  return child->exit_status;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
+  process *cur_proc = process_current(), *child;
+  struct list_elem *ele;
+  cur_proc->status |= PROC_EXIT;
+  // make all child of cur_proc parentless
+  for (ele=list_begin(&cur_proc->child_list); ele!=list_end(&cur_proc->child_list); ele=list_next(ele)){
+    child = list_entry(ele, struct process, proc_elem);
+    if(!(child->status & PROC_EXIT)) child->parent=NULL;
+  }
+
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
