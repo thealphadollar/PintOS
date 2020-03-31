@@ -146,14 +146,55 @@ filesize (int fd){
 // system call to read data from file descriptor
 static int 
 read (int fd, void *buffer, unsigned size){
+  // check if user input is valid
+  user_input_validator(buffer);
+  int bytes = 0;
+  uint8_t *buff = (uint8_t *) buffer;
+  lock_acquire(&call_lock);
 
+  if (fd==0){
+    uint8_t buf;
+    while(bytes<size && (buf=input_getc())!=0){
+      *buff++ = buf;
+      bytes++;
+    }
+    lock_release(&call_lock);
+    return bytes;
+  }
+
+  struct file *file = get_file(fd);
+  if (file != NULL){
+    bytes = file_read(file, buffer, size);
+    lock_release(&call_lock);
+    return bytes;
+  }
+  lock_release(&call_lock);
+  return -1;
 }
 
 // system call to write data to file descriptor
 static int 
 write (int fd, const void *buffer, unsigned size){
-  if (fd == 1) putbuf(buffer, size);
-  return size;
+  // check if user input is valid
+  user_input_validator(buffer);
+
+  int bytes=-1;
+  lock_acquire(&call_lock);
+
+  if (fd == 1) {
+    putbuf(buffer, size);
+    lock_release(&call_lock);
+    return size;
+  }
+
+  struct file *file = get_file(fd);
+  if (file != NULL){
+    bytes = file_write(file, buffer, size);
+    lock_release(&call_lock);
+    return bytes;
+  }
+  lock_release(&call_lock);
+  return bytes;
 }
 
 // system call to close file descriptor
