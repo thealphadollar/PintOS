@@ -200,7 +200,7 @@ thread_create (const char *name, int priority,
 
     // pass details to new generated process
     new_proc->parent = cur_proc;
-    new_proc->status = PROCESS_LOADING;
+    new_proc->status = PROC_LOADING;
     new_proc->pid = t->tid;
     new_proc->exit_status = -1;
     new_proc->is_waiting = false;

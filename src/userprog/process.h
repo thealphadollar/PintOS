@@ -29,6 +29,7 @@ typedef struct process_
     // define state variables
     int status, exit_status;
     bool is_waiting;            /* whether parent is waiting or not, if not then orphan*/
+    int fd_tracker;             /* track file descriptors */
 } process;
 
 // a file locked or attached to a process
@@ -45,4 +46,6 @@ void process_exit (void);
 void process_activate (void);
 process *process_current(void);
 process *find_proc_child(process *proc, pid_t pid);
+struct file *get_file(int fd);
+int get_descriptor(struct file *file);
 #endif /* userprog/process.h */

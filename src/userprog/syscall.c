@@ -15,6 +15,7 @@ static void syscall_handler (struct intr_frame *);
 static int get_byte(const uint8_t *unsigned_addr);
 static bool put_byte (uint8_t *unsigned_dst, uint8_t byte);
 static uint32_t get_word (const uint32_t *unsigned_addr);
+static void user_input_validator(const uint8_t *unsigned_addr);
 
 void
 syscall_init (void) 
@@ -77,6 +78,9 @@ exit (int status){
 // system call to create a file
 static bool
 create (const char *file, unsigned initial_size){
+  // check if user input is valid
+  user_input_validator(file);
+  
   lock_acquire(&call_lock);
   if (filesys_create(file, initial_size)){
     lock_release(&call_lock);
@@ -89,13 +93,34 @@ create (const char *file, unsigned initial_size){
 // system call to remove file
 static bool
 remove (const char *file){
+  // check if user input is valid
+  user_input_validator(file);
 
+  lock_acquire(&call_lock);
+  if (filesys_remove(file)){
+    lock_release(&call_lock);
+    return true;
+  }
+  lock_release(&call_lock);
+  return false;
 }
 
 // system call to open a file and return file descriptor
 static int
 open (const char *file){
+  int fd;
+  // check if user input is valid
+  user_input_validator(file);
 
+  lock_acquire(&call_lock);
+  struct file *file_ = filesys_open(file);
+  if (file_ == NULL){
+    lock_release(&call_lock);
+    return -1;
+  }
+  fd = get_descriptor(file_);
+  lock_release(&call_lock);
+  return false; 
 }
 
 // system call to get size of the file
@@ -120,7 +145,22 @@ write (int fd, const void *buffer, unsigned size){
 // system call to close file descriptor
 static void
 close (int fd){
+  lock_acquire(&call_lock);
 
+  proc_file *p_file_;
+  struct list *f_list = &process_current ()->file_list;
+  struct list_elem *ele;
+  for (ele=list_begin (f_list); ele != list_end (f_list); ele = list_next (ele)){
+      p_file_ = list_entry (ele, proc_file, elem);
+      if (p_file_->fd == fd)
+        file_close(p_file_->file);
+        list_remove(ele);
+        free(p_file_);
+        lock_release(&call_lock);
+        return ;
+    }
+  lock_release(&call_lock);  
+  return ;
 }
 
 
@@ -172,4 +212,12 @@ get_byte(const uint8_t *unsigned_addr){
   }
   // when not user memory
   return -1;
+}
+
+static void
+user_input_validator(const uint8_t *unsigned_addr){
+  // exit if invalid input address
+  if (get_byte(unsigned_addr) == -1) {
+    exit(-1);
+  }
 }

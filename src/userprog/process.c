@@ -88,12 +88,14 @@ start_process (void *args_)
   if (success) {
     cur_proc->status |= PROC_RUNNING;
     cur_proc->exec_file = exec_file;
+    cur_proc->fd_tracker = 2;
     list_init(&curr->file_list);
   }
   /* If load failed, quit. */
   if (!success) {
-    cur_proc->status |= PROCESS_FAIL;
+    cur_proc->status |= PROC_FAIL;
     cur_proc->exec_file = exec_file;
+    cur_proc->fd_tracker = 2;
     list_init(&curr->file_list);
     free(args);
     thread_exit ();
@@ -143,6 +145,12 @@ process_exit (void)
   cur_proc->status |= PROC_EXIT;
   list_remove(&cur_proc->proc_elem);
   file_close(cur_proc->exec_file);
+  // close all files
+  for (ele=list_begin(&cur_proc->file_list); ele!=list_end(&cur_proc->file_list); ele=list_next(ele)){
+    proc_file *file_ = list_entry(ele, proc_file, proc_elem);
+    file_close(file_->file);
+    free(file_);
+  } 
 
   struct thread *cur = thread_current ();
   uint32_t *pd;
@@ -597,4 +605,33 @@ find_proc_child(process *proc, pid_t pid){
         if (ch->pid == pid) return ch;
     }
   return NULL;
+}
+
+/* Return file given fd */
+struct file *
+get_file (int fd)
+{
+  proc_file *p_file_;
+  struct list *f_list = &process_current ()->file_list;
+  struct list_elem *ele;
+  for (ele=list_begin (f_list); ele != list_end (f_list); ele = list_next (ele)){
+      p_file_ = list_entry (ele, proc_file, elem);
+      if (p_file_->fd == fd)
+        return p_file_->file;
+    }
+  return NULL;
+}
+
+/* Return fd given the process file. */
+int
+get_descriptor (struct file *file)
+{
+  proc_file *p_file_ = (proc_file *) malloc (sizeof (struct process_file));
+
+  process *cur_proc = process_current();
+  p_file_->fd = cur_proc->fd_tracker++;
+  p_file_->file = file;
+  list_push_back (&cur_proc->file_list, &p_file_->elem);
+
+  return p_file_->fd;
 }
