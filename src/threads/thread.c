@@ -98,6 +98,14 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+// set process details for user program
+#ifdef USERPROG
+  (&initial_thread->process)->pid = (pid_t)initial_thread->tid;
+  (&initial_thread->process)->parent = NULL;
+#endif
+
+
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -183,6 +191,21 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+  // initialize user process details
+  #ifdef USERPROG
+    struct process *cur_proc = process_current();
+    struct process *new_proc = &t->process;
+
+    // pass details to new generated process
+    new_proc->parent = cur_proc;
+    new_proc->status = PROCESS_LOADING;
+    new_proc->pid = t->tid;
+    new_proc->exit_status = -1;
+    new_proc->is_waiting = false;
+    list_push_back(&cur_proc->child_list, &new_proc->elem);
+
+  #endif
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -469,6 +492,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+  #ifdef USERPROG
+    list_init(&(&t->process)->child_list);
+    list_init(&(&t->process)->file_list);
+  #endif
   list_push_back (&all_list, &t->allelem);
 }
 

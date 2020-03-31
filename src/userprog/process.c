@@ -27,7 +27,7 @@ typedef struct arguments {
 } args_t;
 
 static thread_func start_process NO_RETURN;
-static bool load (args_t *args, void (**eip) (void), void **esp);
+static bool load (args_t *args, void (**eip) (void), void **esp, struct file **exec);
 static void arg_parser(char *cmd, args_t *args);
 static void send_args_to_stack(args_t *args, void **esp);
 
@@ -35,7 +35,7 @@ static void send_args_to_stack(args_t *args, void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
-tid_t
+pid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
@@ -47,7 +47,7 @@ process_execute (const char *file_name)
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
-    return TID_ERROR;
+    return PID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
   // allocate memory for arguments
@@ -57,12 +57,12 @@ process_execute (const char *file_name)
   arg_parser(fn_copy, args);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (args->argv[0], PRI_DEFAULT, start_process, args);
-  if (tid == TID_ERROR)
+  pid = (pid_t) thread_create (args->argv[0], PRI_DEFAULT, start_process, args);
+  if (PID == PID_ERROR)
     // free memory taken by args
     free(args);
     palloc_free_page (fn_copy); 
-  return tid;
+  return pid;
 }
 
 /* A thread function that loads a user process and starts it
@@ -72,6 +72,7 @@ start_process (void *args_)
 {
   // char *file_name = file_name_;
   args_t *args = args_;
+  struct file *exec;
   struct intr_frame if_;
   bool success;
 
@@ -81,12 +82,22 @@ start_process (void *args_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   // success = load (file_name, &if_.eip, &if_.esp);
-  success = load (args, &if_.eip, &if_.esp);
+  success = load (args, &if_.eip, &if_.esp, &exec);
 
+  process *cur_proc = process_current();
+  if (success) {
+    cur_proc->status |= PROC_RUNNING;
+    cur_proc->exec_file = exec_file;
+    list_init(&curr->file_list);
+  }
   /* If load failed, quit. */
-  free(args);
-  if (!success) 
+  if (!success) {
+    cur_proc->status |= PROCESS_FAIL;
+    cur_proc->exec_file = exec_file;
+    list_init(&curr->file_list);
+    free(args);
     thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -154,6 +165,7 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
+
 
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
@@ -229,7 +241,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (args_t *args, void (**eip) (void), void **esp) 
+load (args_t *args, void (**eip) (void), void **esp, struct file **exec) 
 {
   // init replaced argument
   char *file_name = args->argv[0];
@@ -334,6 +346,8 @@ load (args_t *args, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
+
+  *exec = file;
 
   success = true;
 
@@ -545,4 +559,25 @@ send_args_to_stack(args_t *args, void **esp)
 
   // free memory
   free (arg_pointers);
+}
+
+// Return the current process.
+process *
+process_current (void){
+  return &thread_current()->process;
+}
+
+// Return the child process with given pid
+process *
+find_proc_child(process *proc, pid_t pid){
+  process *ch;
+  struct list_elem *ele;
+  for (ele = list_begin(&proc->child_list);
+      ele != list_end(&proc->child_list);
+      ele = list_next(ele)){
+    
+        ch = list_entry(ele, process, proc_elem);
+        if (ch->pid == pid) return ch;
+    }
+  return NULL;
 }
