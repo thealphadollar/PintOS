@@ -126,7 +126,21 @@ open (const char *file){
 // system call to get size of the file
 static int
 filesize (int fd){
+  lock_acquire(&call_lock);
 
+  proc_file *p_file_;
+  int size;
+  struct list *f_list = &process_current ()->file_list;
+  struct list_elem *ele;
+  for (ele=list_begin (f_list); ele != list_end (f_list); ele = list_next (ele)){
+      p_file_ = list_entry (ele, proc_file, elem);
+      if (p_file_->fd == fd)
+        size = file_length(p_file_->file);
+        lock_release(&call_lock);
+        return size;
+    }
+  lock_release(&call_lock);  
+  return -1;
 }
 
 // system call to read data from file descriptor
