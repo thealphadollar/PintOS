@@ -60,6 +60,7 @@ process_execute (const char *file_name)
   pid = (pid_t) thread_create (args->argv[0], PRI_DEFAULT, start_process, args);
   if (PID == PID_ERROR)
     // free memory taken by args
+    palloc_free_page(args->argv);
     free(args);
     palloc_free_page (fn_copy); 
   return pid;
@@ -72,7 +73,7 @@ start_process (void *args_)
 {
   // char *file_name = file_name_;
   args_t *args = args_;
-  struct file *exec;
+  struct file *exec=NULL;
   struct intr_frame if_;
   bool success;
 
@@ -87,16 +88,14 @@ start_process (void *args_)
   process *cur_proc = process_current();
   if (success) {
     cur_proc->info->status |= PROC_RUNNING;
-    cur_proc->exec_file = exec_file;
+    cur_proc->exec_file = exec;
     cur_proc->fd_tracker = 2;
-    list_init(&curr->file_list);
   }
   /* If load failed, quit. */
   if (!success) {
     cur_proc->info->status |= PROC_FAIL;
-    cur_proc->exec_file = exec_file;
+    cur_proc->exec_file = exec;
     cur_proc->fd_tracker = 2;
-    list_init(&curr->file_list);
     free(args);
     thread_exit ();
   }

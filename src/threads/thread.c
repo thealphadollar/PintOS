@@ -203,7 +203,10 @@ thread_create (const char *name, int priority,
     new_proc->pid = (pid_t) t->tid;
     new_proc->parent = cur_proc;
     new_info = (proc_info *) malloc(sizeof(proc_info));
-    if (new_info == NULL) return TID_ERROR;
+    if (new_info == NULL) {
+      palloc_free_page(t);
+      return TID_ERROR;
+    }
     new_proc->info = new_info;
     new_info->pid = (pid_t) t->tid;
     new_info->process = new_proc;
