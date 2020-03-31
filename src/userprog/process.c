@@ -134,12 +134,15 @@ process_exit (void)
 {
   process *cur_proc = process_current(), *child;
   struct list_elem *ele;
-  cur_proc->status |= PROC_EXIT;
   // make all child of cur_proc parentless
   for (ele=list_begin(&cur_proc->child_list); ele!=list_end(&cur_proc->child_list); ele=list_next(ele)){
     child = list_entry(ele, struct process, proc_elem);
     if(!(child->status & PROC_EXIT)) child->parent=NULL;
   }
+
+  cur_proc->status |= PROC_EXIT;
+  list_remove(&cur_proc->proc_elem);
+  file_close(cur_proc->exec_file);
 
   struct thread *cur = thread_current ();
   uint32_t *pd;
@@ -261,13 +264,12 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
-  bool success = false;
   int i;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
-    goto done;
+    goto fail;
   process_activate ();
 
   /* Open executable file. */
@@ -275,8 +277,11 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
-      goto done; 
+      goto fail; 
     }
+
+  // deny writing to the executable binary
+  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -288,7 +293,7 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
       || ehdr.e_phnum > 1024) 
     {
       printf ("load: %s: error loading executable\n", file_name);
-      goto done; 
+      goto fail; 
     }
 
   /* Read program headers. */
@@ -298,11 +303,11 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
       struct Elf32_Phdr phdr;
 
       if (file_ofs < 0 || file_ofs > file_length (file))
-        goto done;
+        goto fail;
       file_seek (file, file_ofs);
 
       if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
-        goto done;
+        goto fail;
       file_ofs += sizeof phdr;
       switch (phdr.p_type) 
         {
@@ -316,7 +321,7 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
         case PT_DYNAMIC:
         case PT_INTERP:
         case PT_SHLIB:
-          goto done;
+          goto fail;
         case PT_LOAD:
           if (validate_segment (&phdr, file)) 
             {
@@ -342,17 +347,17 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
                 }
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
-                goto done;
+                goto fail;
             }
           else
-            goto done;
+            goto fail;
           break;
         }
     }
 
   /* Set up stack. */
   if (!setup_stack (esp))
-    goto done;
+    goto fail;
 
   send_args_to_stack (args, esp);
 
@@ -361,12 +366,12 @@ load (args_t *args, void (**eip) (void), void **esp, struct file **exec)
 
   *exec = file;
 
-  success = true;
+  return true;
 
- done:
-  /* We arrive here whether the load is successful or not. */
+ fail:
+  /* We arrive here if the load is not successful. */
   file_close (file);
-  return success;
+  return false;
 }
 
 /* load() helpers. */
