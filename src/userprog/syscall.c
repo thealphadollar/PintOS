@@ -77,7 +77,13 @@ exit (int status){
 // system call to create a file
 static bool
 create (const char *file, unsigned initial_size){
-
+  lock_acquire(&call_lock);
+  if (filesys_create(file, initial_size)){
+    lock_release(&call_lock);
+    return true;
+  }
+  lock_release(&call_lock);
+  return false;
 }
 
 // system call to remove file
