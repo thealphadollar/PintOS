@@ -195,16 +195,22 @@ thread_create (const char *name, int priority,
 
   // initialize user process details
   #ifdef USERPROG
-    struct process *cur_proc = process_current();
-    struct process *new_proc = &t->process;
+    process *cur_proc = process_current();
+    process *new_proc = &t->process;
+    proc_info *new_info;
 
     // pass details to new generated process
+    new_proc->pid = (pid_t) t->tid;
     new_proc->parent = cur_proc;
-    new_proc->status = PROC_LOADING;
-    new_proc->pid = t->tid;
-    new_proc->exit_status = -1;
-    new_proc->is_waiting = false;
-    list_push_back(&cur_proc->child_list, &new_proc->elem);
+    new_info = (proc_info *) malloc(sizeof(proc_info));
+    if (new_info == NULL) return TID_ERROR;
+    new_proc->info = new_info;
+    new_info->pid = (pid_t) t->tid;
+    new_info->process = new_proc;
+    new_info->status = PROC_LOADING;
+    new_info->exit_status = -1;
+    new_info->is_waiting = false;
+    list_push_back(&cur_proc->child_list, &new_info->elem);
 
   #endif
 

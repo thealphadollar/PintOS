@@ -86,14 +86,14 @@ start_process (void *args_)
 
   process *cur_proc = process_current();
   if (success) {
-    cur_proc->status |= PROC_RUNNING;
+    cur_proc->info->status |= PROC_RUNNING;
     cur_proc->exec_file = exec_file;
     cur_proc->fd_tracker = 2;
     list_init(&curr->file_list);
   }
   /* If load failed, quit. */
   if (!success) {
-    cur_proc->status |= PROC_FAIL;
+    cur_proc->info->status |= PROC_FAIL;
     cur_proc->exec_file = exec_file;
     cur_proc->fd_tracker = 2;
     list_init(&curr->file_list);
@@ -123,26 +123,31 @@ start_process (void *args_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  process *cur_proc = process_current(), *child = find_proc_child(cur_proc, child_tid);
+  process *cur_proc = process_current();
+  proc_info *child = find_proc_child(cur_proc, child_tid);
   if (child->is_waiting || child == NULL) return -1;
   child->is_waiting = true;
   while(!(child->status & PROC_EXIT)) thread_yield();
-  return child->exit_status;
+  int exit_c = child->exit_status;
+  list_remove(&child->elem);
+  free(child);
+  return exit_c;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
-  process *cur_proc = process_current(), *child;
+  process *cur_proc = process_current();
+  proc_info *child;
   struct list_elem *ele;
   // make all child of cur_proc parentless
   for (ele=list_begin(&cur_proc->child_list); ele!=list_end(&cur_proc->child_list); ele=list_next(ele)){
-    child = list_entry(ele, struct process, proc_elem);
-    if(!(child->status & PROC_EXIT)) child->parent=NULL;
+    child = list_entry(ele, proc_info, proc_elem);
+    if(!(child->status & PROC_EXIT)) child->process->parent=NULL;
   }
 
-  cur_proc->status |= PROC_EXIT;
+  cur_proc->info->status |= PROC_EXIT;
   list_remove(&cur_proc->proc_elem);
   file_close(cur_proc->exec_file);
   // close all files
@@ -593,15 +598,15 @@ process_current (void){
 }
 
 // Return the child process with given pid
-process *
+proc_info *
 find_proc_child(process *proc, pid_t pid){
-  process *ch;
+  proc_info *ch;
   struct list_elem *ele;
   for (ele = list_begin(&proc->child_list);
       ele != list_end(&proc->child_list);
       ele = list_next(ele)){
     
-        ch = list_entry(ele, process, proc_elem);
+        ch = list_entry(ele, proc_info, proc_elem);
         if (ch->pid == pid) return ch;
     }
   return NULL;

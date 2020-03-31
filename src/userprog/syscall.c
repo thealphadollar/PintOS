@@ -71,7 +71,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 // exit system call
 static void
 exit (int status){
-  process_current()->exit_status = status;
+  process_current()->info->exit_status = status;
   thread_exit();
 }
 

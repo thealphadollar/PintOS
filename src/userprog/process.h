@@ -20,17 +20,24 @@ typedef int pid_t;
 typedef struct process_
 {
     pid_t pid;          /* process identifier */
-    struct process *parent;      /* parent of the current process */
+    struct process_ *parent;      /* parent of the current process */
     struct list child_list;     /* list of children */
     struct list file_list;      /* list of files */
     struct file *exec_file;     /* executable file */
-    struct list_elem proc_elem;      /* list element */
+
+    struct process_info *info;            /* process information */
 
     // define state variables
-    int status, exit_status;
-    bool is_waiting;            /* whether parent is waiting or not, if not then orphan*/
     int fd_tracker;             /* track file descriptors */
 } process;
+
+typedef struct process_info {
+    pid_t pid;
+    struct process_ *process;
+    int status, exit_status;
+    bool is_waiting;            /* whether parent is waiting or not, if not then orphan*/
+    struct list_elem proc_elem;      /* list element */
+} proc_info;
 
 // a file locked or attached to a process
 typedef struct process_file
@@ -45,7 +52,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 process *process_current(void);
-process *find_proc_child(process *proc, pid_t pid);
+proc_info *find_proc_child(process *proc, pid_t pid);
 struct file *get_file(int fd);
 int get_descriptor(struct file *file);
 #endif /* userprog/process.h */
