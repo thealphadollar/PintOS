@@ -17,6 +17,9 @@ static bool put_byte (uint8_t *unsigned_dst, uint8_t byte);
 static uint32_t get_word (const uint32_t *unsigned_addr);
 static void user_input_validator(const uint8_t *unsigned_addr);
 
+// a lock to provide mutual exclusion between system calls
+static struct lock call_lock;
+
 void
 syscall_init (void) 
 {

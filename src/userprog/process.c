@@ -39,7 +39,7 @@ pid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
-  tid_t tid;
+  pid_t pid;
   args_t *args;
   args = (args_t *) malloc(sizeof(args_t));
 
@@ -58,7 +58,7 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   pid = (pid_t) thread_create (args->argv[0], PRI_DEFAULT, start_process, args);
-  if (PID == PID_ERROR)
+  if (pid == TID_ERROR)
     // free memory taken by args
     palloc_free_page(args->argv);
     free(args);
@@ -128,7 +128,7 @@ process_wait (tid_t child_tid UNUSED)
   child->is_waiting = true;
   while(!(child->status & PROC_EXIT)) thread_yield();
   int exit_c = child->exit_status;
-  list_remove(&child->elem);
+  list_remove(&child->proc_elem);
   free(child);
   return exit_c;
 }
@@ -147,7 +147,6 @@ process_exit (void)
   }
 
   cur_proc->info->status |= PROC_EXIT;
-  list_remove(&cur_proc->proc_elem);
   file_close(cur_proc->exec_file);
   // close all files
   for (ele=list_begin(&cur_proc->file_list); ele!=list_end(&cur_proc->file_list); ele=list_next(ele)){

@@ -6,9 +6,6 @@
 void syscall_init (void);
 #define pid_t int
 
-// a lock to provide mutual exclusion between system calls
-static struct lock call_lock;
-
 // implement sys call definition
 static void exit (int status);
 static bool create (const char *file, unsigned initial_size);
