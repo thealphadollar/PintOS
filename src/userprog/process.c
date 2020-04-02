@@ -120,10 +120,10 @@ start_process (void *args_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (pid_t child_pid) 
 {
   process *cur_proc = process_current();
-  proc_info *child = find_proc_child(cur_proc, child_tid);
+  proc_info *child = find_proc_child(cur_proc, child_pid);
   if (child->is_waiting || child == NULL) return -1;
   child->is_waiting = true;
   while(!(child->status & PROC_EXIT)) thread_yield();
