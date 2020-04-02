@@ -150,7 +150,7 @@ process_exit (void)
   file_close(cur_proc->exec_file);
   // close all files
   for (ele=list_begin(&cur_proc->file_list); ele!=list_end(&cur_proc->file_list); ele=list_next(ele)){
-    proc_file *file_ = list_entry(ele, proc_file, proc_elem);
+    proc_file *file_ = list_entry(ele, proc_file, elem);
     file_close(file_->file);
     free(file_);
   } 

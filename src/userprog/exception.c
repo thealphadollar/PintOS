@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <debug.h>
 #include "userprog/gdt.h"
+#include "userprog/syscall.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "userprog/syscall.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -159,16 +159,15 @@ page_fault (struct intr_frame *f)
 //           write ? "writing" : "reading",
 //           user ? "user" : "kernel");
 //   kill (f);
-   if (user) {
-      // process exiting
-      exit(-1);
-      NOT_REACHED();
-   }
-   else {
+   if (!user) {
       f->eip = (void (*) (void)) f->eax;
       f->eax = (uint32_t) 0xffffffff;
 
       return;
+      
    }
+   // process exiting
+   sys_exit(-1);
+   NOT_REACHED();
 }
 

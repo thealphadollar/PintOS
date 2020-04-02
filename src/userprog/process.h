@@ -1,11 +1,11 @@
 #ifndef USERPROG_PROCESS_H
 #define USERPROG_PROCESS_H
 #include <list.h>
-#include "threads/thread.h"
 
 // Process definitions
 
 typedef int pid_t;
+#define PID_ERROR ((pid_t) -1)
 
 // Process status ENUMS
 #define PROC_LOADING 0

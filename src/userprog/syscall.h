@@ -4,10 +4,9 @@
 #define USERPROG_SYSCALL_H
 
 void syscall_init (void);
-#define pid_t int
 
 // implement sys call definition
-static void exit (int status);
+void sys_exit (int status);
 static bool create (const char *file, unsigned initial_size);
 static bool remove (const char *file);
 static int open (const char *file);

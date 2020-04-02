@@ -37,7 +37,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch(get_word(esp))
   {
     case SYS_EXIT:
-      exit((int) get_word((esp)+1));
+      sys_exit((int) get_word((esp)+1));
       break;
     case SYS_CREATE:
       f->eax = create((const char *) get_word((esp)+1), 
@@ -72,8 +72,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 }
 
 // exit system call
-static void
-exit (int status){
+void
+sys_exit (int status){
   process_current()->info->exit_status = status;
   thread_exit();
 }
@@ -253,10 +253,10 @@ get_word(const uint32_t *unsigned_addr){
         *((uint8_t *) &result+i) = (uint8_t) byte;
       }
       // failed to get byte
-      exit(-1);
+      sys_exit(-1);
     }
   }
-  exit(-1);
+  sys_exit(-1);
 }
 
 // Read a byte at user's virtual address provided as argument
@@ -276,6 +276,6 @@ static void
 user_input_validator(const uint8_t *unsigned_addr){
   // exit if invalid input address
   if (get_byte(unsigned_addr) == -1) {
-    exit(-1);
+    sys_exit(-1);
   }
 }

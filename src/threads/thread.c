@@ -213,7 +213,7 @@ thread_create (const char *name, int priority,
     new_info->status = PROC_LOADING;
     new_info->exit_status = -1;
     new_info->is_waiting = false;
-    list_push_back(&cur_proc->child_list, &new_info->elem);
+    list_push_back(&cur_proc->child_list, &new_info->proc_elem);
 
   #endif
 
